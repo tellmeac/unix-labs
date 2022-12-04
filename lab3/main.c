@@ -1,7 +1,7 @@
 #include <sys/types.h>
-#include <sys/socket.h> // содержит определения флагов уровня сокета
+#include <sys/socket.h>
 #include <stdio.h>
-#include <netinet/in.h> // Protocols are specified
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -9,7 +9,6 @@
 #include <signal.h>
 #include <errno.h>
 
-// An integer type which can be accessed as an atomic entity even in the presence of asynchronous interrupts made by signals.
 volatile sig_atomic_t wasSigHup = 0;
 
 void sigHupHandler(int r)
@@ -21,25 +20,12 @@ int main()
 {
     int listenfd = 0;
 
-    // Создание сокета
-    // The function socket() creates an endpoint for communication and returns a file descriptor for the socket.
-    // Takes 3 arguments domain, which specifies the protocol family of the created socket; type; protocol, the value 0 may be used to select a default protocol from the selected domain and type.
-    // The function returns -1 if an error occurred. Otherwise, it returns an integer representing the newly assigned descriptor.
-
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
     if (listenfd == -1)
     {
-        perror("socket"); // Prints a textual description of the error code currently stored in the system variable errno to stderr.
+        perror("socket");
         return -1;
     }
-
-    // Sets a socket option
-    // Takes a descriptor that identifies a socket;
-    // the level at which the option is defined;
-    // the socket option for which the value is to be set, the optname parameter must be a socket option defined within the specified level, or behavior is undefined;
-    // a pointer to the buffer in which the value for the requested option is specified;
-    // The size, in bytes, of the buffer pointed to by the optval parameter
-    // SO_REUSEADDR указывает, что правила проверки адресов, передаваемых с помощью вызова bind(2), должны позволять повторное использование локального адреса.
 
     int yes = 1;
     if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
@@ -48,7 +34,6 @@ int main()
         return -1;
     }
 
-    // Устанавливает первые n байтов области, начинающейся с s в нули (пустые байты).
     struct sockaddr_in addr;
     bzero(&addr, sizeof(struct sockaddr_in));
     addr.sin_family = AF_INET;
@@ -62,7 +47,6 @@ int main()
         return -1;
     }
 
-    // If set to SOMAXCONN, the underlying service provider responsible for socket s will set the backlog to a maximum reasonable value.
     if (listen(listenfd, SOMAXCONN) < 0)
     {
         perror("listen");
@@ -109,8 +93,6 @@ int main()
             if (client_fd > maxFd)
                 maxFd = client_fd;
         }
-
-        // n на единицу больше самого большого номера описателей из всех наборов.
 
         // Вызов функции pselect() временно
         // разблокирует необходимый сигнал и дождётся одного
