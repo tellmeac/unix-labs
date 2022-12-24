@@ -16,7 +16,7 @@ function cleanup(){
 }
 # Explored from $(man 7 signal)
 # EXIT - pseudo sigal (bash-generated)
-trap cleanup EXIT SIGINT SIGTERM SIGKILL SIGHUP
+trap cleanup EXIT HUP INT QUIT PIPE TERM
 
 # Extracts directive value from source file
 # Globals:
