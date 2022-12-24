@@ -15,7 +15,7 @@ function cleanup(){
 	exit $rc
 }
 # Explored from $(man 7 signal)
-trap cleanup EXIT
+trap cleanup EXIT SIGINT
 
 # Extracts directive value from source file
 # Globals:
