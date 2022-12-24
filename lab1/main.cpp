@@ -1,6 +1,6 @@
 #include <iostream>
 
-// @result:result.out
+// @result:example.out
 int main()
 {
     std::cout << "Sample\n";

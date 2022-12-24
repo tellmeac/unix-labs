@@ -1,32 +1,53 @@
 #!/bin/bash
+#
+# Build application with specific directives.
 
-SCRIPT_DIR=" $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-WORK_DIR=$(mktemp -d)
+readonly ROOT="$PWD"
+readonly BUILD_DIR=$(mktemp -d build.XXX)
+readonly SOURCE_FILE='./main.cpp'
+readonly RESULT_DIRECTIVE='@result'
 
 trap exit_handler EXIT HUP INT QUIT PIPE TERM
 function exit_handler(){
 	local rc=$?
-	[ -d $WORK_DIR ] && rm -r $WORK_DIR
+
+	[ -d $BUILD_DIR ] && rm -r $BUILD_DIR
 	exit $rc
 }
 
-RESULT_DIRECTIVE='// @result:'
-DEFAULT_RESULT=main.out
+# Returns directive value or 1 if failed
+# Globals:
+# 	SOURCE_FILE
+# Arguments:
+# 	name
+# Outputs:
+# 	Writes directive value to stdout
+extract_directive_value() {
+	local name=$1
 
-if (gcc --version)
-then
-	if grep "$RESULT_DIRECTIVE" main.cpp
+
+	local line="$(grep $name $SOURCE_FILE)"
+	if [ $? -ne 0 ]
 	then
-		compile_path=$(grep "$RESULT_DIRECTIVE" main.cpp)
-		DEFAULT_RESULT=$(echo "$compile_path" | cut -d ':' -f 2)
-    else
-        echo "result filename should be specified with @result commentary in source, using default"
+		return 1
 	fi
-	make RESULT=$WORK_DIR/$DEFAULT_RESULT
-else
-	echo "gcc is not installed"
+
+	echo "$(echo "$line" | cut -d ':' -f 2)"
+	return 0
+}
+
+local binary_name="$(extract_directive_value $RESULT_DIRECTIVE $source_file)"
+if [ $? -ne 0 ]
+then 
+	echo 'Failed to resolve destionation path'
 	exit 1
 fi
 
-cp -f $WORK_DIR/$DEFAULT_RESULT $SCRIPT_DIR
-rm -r $WORK_DIR
+binary_path=$BUILD_DIR/$binary_name
+
+make RESULT=$binary_path
+
+cp -f $binary_path $ROOT
+
+echo 'Done'
+exit 0
