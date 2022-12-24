@@ -25,7 +25,6 @@ function exit_handler(){
 extract_directive_value() {
 	local name=$1
 
-
 	local line="$(grep $name $SOURCE_FILE)"
 	if [ $? -ne 0 ]
 	then
