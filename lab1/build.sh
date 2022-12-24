@@ -35,7 +35,7 @@ extract_directive_value() {
 	return 0
 }
 
-local binary_name="$(extract_directive_value $RESULT_DIRECTIVE $source_file)"
+binary_name="$(extract_directive_value $RESULT_DIRECTIVE $source_file)"
 if [ $? -ne 0 ]
 then 
 	echo 'Failed to resolve destionation path'
@@ -43,9 +43,7 @@ then
 fi
 
 binary_path=$BUILD_DIR/$binary_name
-
 make RESULT=$binary_path
-
 cp -f $binary_path $ROOT
 
 echo 'Done'
