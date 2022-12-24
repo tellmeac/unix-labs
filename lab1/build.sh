@@ -7,15 +7,17 @@ readonly BUILD_DIR=$(mktemp -d build.XXX)
 readonly SOURCE_FILE='./main.cpp'
 readonly RESULT_DIRECTIVE='@result'
 
-trap exit_handler EXIT HUP INT QUIT PIPE TERM
-function exit_handler(){
+# Cleanup handler
+function cleanup(){
 	local rc=$?
 
 	[ -d $BUILD_DIR ] && rm -r $BUILD_DIR
 	exit $rc
 }
+# Explored from $(man 7 signal)
+trap cleanup EXIT
 
-# Returns directive value or 1 if failed
+# Extracts directive value from source file
 # Globals:
 # 	SOURCE_FILE
 # Arguments:
