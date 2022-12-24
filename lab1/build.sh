@@ -15,7 +15,8 @@ function cleanup(){
 	exit $rc
 }
 # Explored from $(man 7 signal)
-trap cleanup EXIT SIGINT
+# EXIT - pseudo sigal (bash-generated)
+trap cleanup EXIT SIGINT SIGTERM SIGKILL SIGHUP
 
 # Extracts directive value from source file
 # Globals:
