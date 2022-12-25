@@ -10,6 +10,8 @@
 #include <errno.h>
 
 #define BUF_SIZE 1024
+#define LISTEN_PORT 8080
+#define LOCAL_HOST "127.0.0.1"
 
 volatile sig_atomic_t gotSigHup = 0;
 
@@ -37,8 +39,8 @@ int main()
     struct sockaddr_in addr;
     bzero(&addr, sizeof(struct sockaddr_in));
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    addr.sin_port = htons(8080);
+    addr.sin_addr.s_addr = inet_addr(LOCAL_HOST);
+    addr.sin_port = htons(LISTEN_PORT);
 
     if (bind(lfd, (struct sockaddr *)&addr, sizeof(addr)) == -1)
     {
@@ -68,7 +70,7 @@ int main()
     sigprocmask(SIG_BLOCK, &blockedMask, &origMask);
 
     char buffer[BUF_SIZE];
-    int cfd, res;
+    int activecfd;
     int clientCount = 0;
 
     if (listen(lfd, SOMAXCONN) == -1)
@@ -79,35 +81,31 @@ int main()
 
     for (;;)
     {
-
         bzero(buffer, sizeof(buffer));
-        printf("-----------------\n");
-        printf("Server is waiting\n");
 
         int nfds = -1;
-
         fd_set rfds;
         FD_SET(lfd, &rfds);
 
         if (lfd > nfds)
-            nfds = lfd + 1;
+            nfds = lfd;
 
         if (clientCount > 0)
         {
-            FD_SET(cfd, &rfds);
-            if (cfd > nfds)
-                nfds = cfd + 1;
+            FD_SET(activecfd, &rfds);
+            if (activecfd > nfds)
+                nfds = activecfd;
         }
 
+        printf("Server is waiting for connections or messages.\n");
         // Wait until ready to read or signals was caught.
-        res = pselect(nfds, &rfds, NULL, NULL, NULL, &origMask);
-        if (res == -1 && errno == EINTR)
+        if (pselect(nfds + 1, &rfds, NULL, NULL, NULL, &origMask) == -1 && errno == EINTR)
         {
             puts("Caught kill signal.");
             return 1;
         }
 
-        // New connections
+        // Handle new connections
         if (FD_ISSET(lfd, &rfds))
         {
 
@@ -126,7 +124,7 @@ int main()
                 continue;
             }
 
-            cfd = csfd;
+            activecfd = csfd;
             clientCount++;
 
             printf("New client has been accepted.\n");
@@ -134,15 +132,13 @@ int main()
         }
 
         // Accept data from clients
-        if (FD_ISSET(cfd, &rfds))
+        if (FD_ISSET(activecfd, &rfds))
         {
-            read(cfd, &buffer, 80);
-            size_t size = strlen(buffer);
-
-            if (size <= 0)
+            read(activecfd, &buffer, BUF_SIZE);
+            if (errno == EOF)
             {
-                close(cfd);
-                cfd = -1;
+                close(activecfd);
+                activecfd = -1;
                 clientCount--;
 
                 printf("Connection has been closed\n");
@@ -150,15 +146,17 @@ int main()
             }
 
             printf("Message accepted:\n");
+            size_t size = strlen(buffer);
             for (size_t i = 0; i < size; i++)
                 printf("%c", buffer[i]);
             printf("\n");
 
             // Echo message back
-            send(cfd, buffer, BUF_SIZE, 0);
+            send(activecfd, buffer, BUF_SIZE, 0);
             printf("Accepted size: %zu bytes\n", size);
         }
 
+        // Handle SIGHUP
         if (gotSigHup)
         {
             gotSigHup = 0;
