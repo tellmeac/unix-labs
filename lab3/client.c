@@ -7,39 +7,37 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define BUF_SIZE 1024
+#define LISTEN_PORT 8080
+
 int main()
 {
-    int sockfd;
-    int len;
+    int cfd = socket(AF_INET, SOCK_STREAM, 0);
+
     struct sockaddr_in address;
-    int result;
-    char ch[80];
-
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = inet_addr("127.0.0.1");
-    address.sin_port = htons(10000);
+    address.sin_port = htons(LISTEN_PORT);
 
-    len = sizeof(address);
-    result = connect(sockfd, (struct sockaddr *)&address, len);
-    if (result < 0)
+    int r = connect(cfd, (struct sockaddr *)&address, sizeof(address));
+    if (r == -1)
     {
         perror("connect");
         exit(1);
     }
 
-    printf("Enter your message: \n");
-    while (1)
+    char buff[BUF_SIZE];
+    for (;;)
     {
-        gets(ch);
-        write(sockfd, &ch, 80);
-        read(sockfd, &ch, 80);
-        if (!strcmp(ch, "-1"))
+        printf("~ $ ");
+        fgets(buff, BUF_SIZE, stdin);
+        write(cfd, &buff, BUF_SIZE);
+        read(cfd, &buff, BUF_SIZE);
+        if (!strcmp(buff, "-1"))
             break;
     }
 
-    close(sockfd);
+    close(cfd);
     puts("Connection closed");
     exit(0);
 }
