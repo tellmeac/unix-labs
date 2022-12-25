@@ -47,7 +47,7 @@ void consume()
 
 int main()
 {
-    thread thread1(provide);
+    thread t(provide);
 
     consume();
 }
