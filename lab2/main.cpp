@@ -48,8 +48,6 @@ void consume()
 int main()
 {
     thread thread1(provide);
-    thread thread2(consume);
 
-    thread1.join();
-    thread2.join();
+    consume();
 }
