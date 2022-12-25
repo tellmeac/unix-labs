@@ -19,8 +19,7 @@ int main()
     address.sin_addr.s_addr = inet_addr("127.0.0.1");
     address.sin_port = htons(LISTEN_PORT);
 
-    int r = connect(cfd, (struct sockaddr *)&address, sizeof(address));
-    if (r == -1)
+    if (connect(cfd, (struct sockaddr *)&address, sizeof(address)) == -1)
     {
         perror("connect");
         exit(1);
@@ -29,12 +28,15 @@ int main()
     char buff[BUF_SIZE];
     for (;;)
     {
+        // Get user imput
         printf("~ $ ");
         fgets(buff, BUF_SIZE, stdin);
+
+        // Send to server
         write(cfd, &buff, BUF_SIZE);
+
+        // Read the response back
         read(cfd, &buff, BUF_SIZE);
-        if (!strcmp(buff, "-1"))
-            break;
     }
 
     close(cfd);
