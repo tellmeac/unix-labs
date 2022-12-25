@@ -134,8 +134,8 @@ int main()
         // Accept data from clients
         if (FD_ISSET(activecfd, &rfds))
         {
-            read(activecfd, &buffer, BUF_SIZE);
-            if (errno == EOF)
+            ssize_t r = read(activecfd, &buffer, BUF_SIZE);
+            if (r <= 0) // errors or EOF
             {
                 close(activecfd);
                 activecfd = -1;
