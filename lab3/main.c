@@ -9,151 +9,160 @@
 #include <signal.h>
 #include <errno.h>
 
-volatile sig_atomic_t wasSigHup = 0;
+#define BUF_SIZE 1024
 
-void sigHupHandler(int r)
+volatile sig_atomic_t gotSigHup = 0;
+
+static void sigHupHandler(int sig)
 {
-    wasSigHup = 1;
+    gotSigHup = 1;
 }
 
 int main()
 {
-    int listenfd = 0;
-
-    listenfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (listenfd == -1)
+    int lfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (lfd == -1)
     {
         perror("socket");
-        return -1;
+        return 1;
     }
 
     int yes = 1;
-    if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
+    if (setsockopt(lfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
     {
         perror("setsockopt");
-        return -1;
+        return 1;
     }
 
     struct sockaddr_in addr;
     bzero(&addr, sizeof(struct sockaddr_in));
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    addr.sin_port = htons(10000);
+    addr.sin_port = htons(8080);
 
-    if (bind(listenfd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+    if (bind(lfd, (struct sockaddr *)&addr, sizeof(addr)) == -1)
     {
         perror("bind");
-        close(listenfd);
-        return -1;
+        close(lfd);
+        return 1;
     }
 
-    if (listen(listenfd, SOMAXCONN) < 0)
-    {
-        perror("listen");
-        return -1;
-    }
-
-    // Register action handlers
+    // Register sigaction handler
     struct sigaction sa;
-    sigaction(SIGHUP, NULL, &sa);
+    sigemptyset(&sa.sa_mask);
+
     sa.sa_handler = sigHupHandler;
     sa.sa_flags |= SA_RESTART;
-    sigaction(SIGHUP, &sa, NULL);
 
-    // Blocking signals
+    if (sigaction(SIGHUP, &sa, NULL) == -1)
+    {
+        perror("sigaction");
+        return 1;
+    }
+
+    // Prepare sig mask for pselect with SIGHUP
     sigset_t blockedMask, origMask;
     sigemptyset(&blockedMask);
+
     sigaddset(&blockedMask, SIGHUP);
     sigprocmask(SIG_BLOCK, &blockedMask, &origMask);
 
-    char ch[80];
-    int client_fd, res;
-    int numberOfClients = 0;
+    char buffer[BUF_SIZE];
+    int cfd, res;
+    int clientCount = 0;
 
-    while (!wasSigHup)
+    if (listen(lfd, SOMAXCONN) == -1)
+    {
+        perror("listen");
+        return 1;
+    }
+
+    for (;;)
     {
 
-        memset(ch, 0, sizeof(ch));
+        bzero(buffer, sizeof(buffer));
         printf("-----------------\n");
         printf("Server is waiting\n");
 
-        int maxFd = -1;
+        int nfds = -1;
 
-        fd_set fds;
-        FD_ZERO(&fds);
-        FD_SET(listenfd, &fds);
+        fd_set rfds;
+        FD_SET(lfd, &rfds);
 
-        // Подготовка списка fd
-        if (listenfd > maxFd)
-            maxFd = listenfd;
+        if (lfd > nfds)
+            nfds = lfd + 1;
 
-        if (numberOfClients > 0)
+        if (clientCount > 0)
         {
-            FD_SET(client_fd, &fds);
-            if (client_fd > maxFd)
-                maxFd = client_fd;
+            FD_SET(cfd, &rfds);
+            if (cfd > nfds)
+                nfds = cfd + 1;
         }
 
-        // Вызов функции pselect() временно
-        // разблокирует необходимый сигнал и дождётся одного
-        // из трёх событий
-
-        res = pselect(maxFd + 1, &fds, NULL, NULL, NULL, &origMask);
+        // Wait until ready to read or signals was caught.
+        res = pselect(nfds, &rfds, NULL, NULL, NULL, &origMask);
         if (res == -1 && errno == EINTR)
         {
-            puts("Caught kill signal");
-            return -1;
+            puts("Caught kill signal.");
+            return 1;
         }
 
         // New connections
-        if (FD_ISSET(listenfd, &fds))
+        if (FD_ISSET(lfd, &rfds))
         {
 
-            int client_sockfd = accept(listenfd, NULL, NULL);
-            if (client_sockfd == 0)
-                perror("accept client_sockfd");
-
-            // By task deifinition, close any other connection
-            if (numberOfClients >= 1)
+            int csfd = accept(lfd, NULL, NULL);
+            if (csfd == -1)
             {
-                close(client_sockfd);
+                perror("accept client socket");
                 continue;
             }
 
-            if (client_fd < 0)
+            // NOTE: By task deifinition, accept and instantly close any other new connections.
+            if (clientCount >= 1)
             {
-                perror("accept");
+                close(csfd);
+                printf("New client has been accepted ans closed.\n");
                 continue;
             }
 
-            client_fd = client_sockfd;
-            numberOfClients++;
-            printf("New client has been accepted\n");
-            printf("Total number of clients: %d\n\n", numberOfClients);
+            cfd = csfd;
+            clientCount++;
+
+            printf("New client has been accepted.\n");
+            printf("Total number of clients: %d.\n\n", clientCount);
         }
 
         // Accept data from clients
-        if (FD_ISSET(client_fd, &fds))
+        if (FD_ISSET(cfd, &rfds))
         {
-            read(client_fd, &ch, 80);
-            int k = strlen(ch);
+            read(cfd, &buffer, 80);
+            size_t size = strlen(buffer);
 
-            printf("Message accepted:\n");
-            for (int i = 0; i < k; i++)
-                printf("%c", ch[i]);
-            printf("\n");
-
-            if (k <= 0)
+            if (size <= 0)
             {
-                close(client_fd);
-                printf("Connection closed\n");
-                client_fd = -1;
-                numberOfClients--;
+                close(cfd);
+                cfd = -1;
+                clientCount--;
+
+                printf("Connection has been closed\n");
                 continue;
             }
 
-            send(client_fd, ch, 80, 0);
-            printf("Accepted size: %d bytes\n", k);
+            printf("Message accepted:\n");
+            for (size_t i = 0; i < size; i++)
+                printf("%c", buffer[i]);
+            printf("\n");
+
+            // Echo message back
+            send(cfd, buffer, BUF_SIZE, 0);
+            printf("Accepted size: %zu bytes\n", size);
+        }
+
+        if (gotSigHup)
+        {
+            gotSigHup = 0;
+            printf("SIGHUP caught! Keep working.\n");
         }
     }
 }
