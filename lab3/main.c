@@ -99,9 +99,9 @@ int main()
 
         printf("Server is waiting for connections or messages.\n");
         // Wait until ready to read or signals was caught.
-        if (pselect(nfds + 1, &rfds, NULL, NULL, NULL, &origMask) == -1 && errno == EINTR)
+        if (pselect(nfds + 1, &rfds, NULL, NULL, NULL, &origMask) == -1)
         {
-            puts("Caught kill signal.");
+            perror("pselect");
             return 1;
         }
 
