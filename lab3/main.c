@@ -151,8 +151,6 @@ int main()
                 printf("%c", buffer[i]);
             printf("\n");
 
-            // Echo message back
-            send(activecfd, buffer, BUF_SIZE, 0);
             printf("Accepted size: %zu bytes\n", size);
         }
 

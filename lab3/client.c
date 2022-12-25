@@ -35,9 +35,6 @@ int main()
 
         // Send to server
         write(cfd, &buff, BUF_SIZE);
-
-        // Read the response back
-        read(cfd, &buff, BUF_SIZE);
     }
 
     close(cfd);
