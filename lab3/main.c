@@ -13,7 +13,7 @@
 #define LISTEN_PORT 8080
 #define LOCAL_HOST "127.0.0.1"
 
-volatile sig_atomic_t gotSigHup = 0;
+static volatile sig_atomic_t gotSigHup = 0;
 
 static void sigHupHandler(int sig)
 {
@@ -49,25 +49,27 @@ int main()
         return 1;
     }
 
+    // Prepare sig mask for pselect with SIGHUP
+    sigset_t blockedMask, emptyMask;
+    sigemptyset(&blockedMask);
+    sigaddset(&blockedMask, SIGHUP);
+    if (sigprocmask(SIG_BLOCK, &blockedMask, NULL) == -1)
+    {
+        perror("sigprocmask");
+        return 1;
+    }
+    sigemptyset(&emptyMask);
+
     // Register sigaction handler
     struct sigaction sa;
-    sigemptyset(&sa.sa_mask);
-
+    sa.sa_flags = 0;
     sa.sa_handler = sigHupHandler;
-    sa.sa_flags |= SA_RESTART;
-
+    sigemptyset(&sa.sa_mask);
     if (sigaction(SIGHUP, &sa, NULL) == -1)
     {
         perror("sigaction");
         return 1;
     }
-
-    // Prepare sig mask for pselect with SIGHUP
-    sigset_t blockedMask, origMask;
-    sigemptyset(&blockedMask);
-
-    sigaddset(&blockedMask, SIGHUP);
-    sigprocmask(SIG_BLOCK, &blockedMask, &origMask);
 
     char buffer[BUF_SIZE];
     int activecfd;
@@ -99,10 +101,17 @@ int main()
 
         printf("Server is waiting for connections or messages.\n");
         // Wait until ready to read or signals was caught.
-        if (pselect(nfds + 1, &rfds, NULL, NULL, NULL, &origMask) == -1)
+        int ready = pselect(nfds + 1, &rfds, NULL, NULL, NULL, &emptyMask);
+        if (ready == -1 && errno != EINTR)
         {
-            perror("pselect");
+            perror("interrupted");
             return 1;
+        }
+
+        if (gotSigHup)
+        {
+            printf("Caught SIGHUP: keep working!\n");
+            continue;
         }
 
         // Handle new connections
@@ -152,13 +161,6 @@ int main()
             printf("\n");
 
             printf("Accepted size: %zu bytes\n", size);
-        }
-
-        // Handle SIGHUP
-        if (gotSigHup)
-        {
-            gotSigHup = 0;
-            printf("SIGHUP caught! Keep working.\n");
         }
     }
 }
