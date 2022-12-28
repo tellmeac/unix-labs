@@ -111,6 +111,7 @@ int main()
         if (gotSigHup)
         {
             printf("Caught SIGHUP: keep working!\n");
+            gotSigHup = 0;
             continue;
         }
 
