@@ -2,9 +2,15 @@
 #
 # Build application with specific directives.
 
+SOURCE_FILE=${1-'./main.cpp'}
+if [ ! -f $SOURCE_FILE ]
+then
+	echo 'Provided invalid path to source file'
+	exit 1
+fi
+
 readonly ROOT="$PWD"
 readonly BUILD_DIR=$(mktemp -d build.XXX)
-readonly SOURCE_FILE='./main.cpp'
 readonly RESULT_DIRECTIVE='@result'
 
 # Cleanup handler
@@ -46,7 +52,14 @@ then
 fi
 
 binary_path=$BUILD_DIR/$binary_name
+
 make RESULT=$binary_path
+if [ $? -ne 0 ]
+then
+	echo 'Failed to compile'
+	exit 1
+fi
+
 cp -f $binary_path $ROOT
 
 echo 'Done'
