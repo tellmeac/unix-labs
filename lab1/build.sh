@@ -10,14 +10,14 @@ then
 fi
 
 readonly ROOT="$PWD"
-readonly BUILD_DIR=$(mktemp -d build.XXX)
+readonly BUILD_DIR=$(mktemp -d)
 readonly RESULT_DIRECTIVE='@result'
 
 # Cleanup handler
 function cleanup(){
 	local rc=$?
-
-	[ -d $BUILD_DIR ] && rm -r $BUILD_DIR
+	rm -r $BUILD_DIR
+	echo $BUILD_DIR
 	exit $rc
 }
 # Explored from $(man 7 signal)
@@ -53,14 +53,15 @@ fi
 
 binary_path=$BUILD_DIR/$binary_name
 
-make RESULT=$binary_path
+cd $BUILD_DIR
+g++ $ROOT/$SOURCE_FILE -o $binary_name
 if [ $? -ne 0 ]
 then
 	echo 'Failed to compile'
 	exit 1
 fi
 
-cp -f $binary_path $ROOT
+mv $binary_name $ROOT
 
 echo 'Done'
 exit 0
