@@ -9,7 +9,7 @@ using namespace std;
 condition_variable cv;
 mutex m;
 
-bool ready = false;
+bool readyToAccept = true;
 long long int event_content = 1;
 
 void provide()
@@ -17,14 +17,17 @@ void provide()
     while (1)
     {
         unique_lock<mutex> lk(m);
-        cv.wait(lk, []
-                { return !ready; });
+        if (!readyToAccept)
+        {
+            lk.unlock();
+            continue;
+        }
 
         event_content *= 2;
 
         cout << "[Provider] Initialized: " << event_content << endl;
 
-        ready = true;
+        readyToAccept = false;
 
         cv.notify_all();
         lk.unlock();
@@ -39,11 +42,11 @@ void consume()
     {
         unique_lock<mutex> lk(m);
         cv.wait(lk, []
-                { return ready; });
+                { return !readyToAccept; });
 
         cout << "[Consumer] Processing with: " << event_content << endl;
 
-        ready = false;
+        readyToAccept = true;
 
         cv.notify_all();
         lk.unlock();
